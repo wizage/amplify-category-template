@@ -1,0 +1,28 @@
+{
+  "name": "amplify-category-template",
+  "version": "1.0.0",
+  "description": "Deploy your own templates",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wizage/amplify-category-template.git"
+  },
+  "keywords": [
+    "amplify",
+    "plugin",
+    "template"
+  ],
+  "author": "wizage",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wizage/amplify-category-template/issues"
+  },
+  "homepage": "https://github.com/wizage/amplify-category-template#readme",
+  "dependencies": {
+    "fs": "0.0.1-security",
+    "inquirer": "^6.3.1"
+  }
+}

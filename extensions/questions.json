@@ -29,7 +29,7 @@
             },
             {
                 "key": "rootLocation",
-                "question": "Path to the root template:",
+                "question": "Path to the root template: (Warning this cli will modify your root template)",
                 "validation": {
                     "operator": "regex",
                     "value": "^(.(.*\\.json$|.*\\.yaml))*$",

@@ -24,6 +24,8 @@
   "dependencies": {
     "fs": "0.0.1-security",
     "inquirer": "^6.3.1",
+    "mime-types": "^2.1.24",
+    "path": "^0.12.7",
     "yaml": "^1.5.0"
   }
 }

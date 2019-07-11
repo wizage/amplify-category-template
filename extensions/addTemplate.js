@@ -1,6 +1,8 @@
-const questions = require('./questions.json')
-const fs = require('fs')
-const inquirer = require('inquirer')
+const questions = require('./questions.json');
+const fs = require('fs');
+const inquirer = require('inquirer');
+const path = require('path');
+const mime = require('mime-types');
 
 module.exports = (context) => {
     context.createTemplate = async () => {
@@ -52,7 +54,7 @@ async function handleYAML(reuslt){
 async function handleJSON(context, result){
     const { amplify } = context;
     const targetBucket = amplify.getProjectMeta().providers.awscloudformation.DeploymentBucketName;
-    const rootTemplate = JSON.parse(fs.readFileSync(result.root));
+    let rootTemplate = JSON.parse(fs.readFileSync(result.root));
     if (!rootTemplate.Parameters){
         rootTemplate.Parameters = {}
     } 
@@ -63,7 +65,7 @@ async function handleJSON(context, result){
             Default: "NONE"
         }
     }
-    if (result.nestedTemplate === "YES"){
+    if (result.isNestedTemplate === "YES"){
         //await migrateNestedURLS(Object.keys(rootTemplate.Resources), rootTemplate.Resources, result);
         Object.keys(rootTemplate.Resources).forEach(resource => {
             let urlSplit = rootTemplate.Resources[resource].Properties.TemplateURL.split('/');
@@ -76,14 +78,66 @@ async function handleJSON(context, result){
             }
         });
     }
-
+    rootTemplate = await generateQuestions(context, rootTemplate)
     //Write out to root template and stage.
-    fs.writeFileSync(result.root, JSON.stringify(rootTemplate));
+    fs.writeFileSync(result.root, JSON.stringify(rootTemplate, null, 4));
     await stageRoot(context, result);
 }
 
-async function generateQuestions(){
-    
+async function generateQuestions(context, rootTemplate){
+    const { amplify } = context;
+    let questions = []
+
+    Object.keys(rootTemplate.Parameters).forEach(key => {
+        let question = {};
+        let param = rootTemplate.Parameters[key];
+        question.name = key;
+        question.message = `${param.Description}`;
+        question.default = (param.Default != undefined) ? param.Default : "";
+        if (param.Type === "String" && param.AllowedPattern != undefined){
+            question.type = "input";
+            question.validation = {};
+            question.validation.operator = "regex";
+            let lengthRegex = "";
+            if (param.MinLength != undefined || param.MaxLength != undefined ){
+                lengthRegex = ((param.MinLength != undefined) ? `{${param.MinLength},` : "{,") + ((param.MaxLength != undefined) ? `${param.MaxLength}}` : "}");
+                if (param.MaxLength == param.MinLength){
+                    lengthRegex = `{${param.MaxLength}}`
+                }
+                if (param.AllowedPattern[param.AllowedPattern.length-1] === '*'){
+                    param.AllowedPattern = param.AllowedPattern.slice(0,-1);
+                }
+            }
+            question.validation.value = `^${param.AllowedPattern}` + ((lengthRegex != "") ? lengthRegex : "") + "$";
+            question.validation.onErrorMesg = param.ConstraintDescription;
+            question.validate = amplify.inputValidation(question);
+            questions.push(question);
+        } else if ((param.Type === "String" || param.Type === "Number") && param.AllowedValues != undefined){
+            question.type = "list";
+            question.choices = param.AllowedValues;
+            questions.push(question);
+        } else if (param.Type === "Number"){
+            question.type = "number";
+            question.validation = {};
+            question.validation.operator = "range";
+            question.validation.value = {};
+            question.validation.value.min = ((param.MinValue != undefined) ? param.MinValue : Number.NEGATIVE_INFINITY);
+            question.validation.value.max = ((param.MaxValue != undefined) ? param.MaxValue : Number.POSITIVE_INFINITY);
+            question.validation.onErrorMesg = param.ConstraintDescription;
+            question.validate = amplify.inputValidation(question);
+            questions.push(question);
+        } else {
+            //Ignore and keep default :)
+        }
+        
+    });
+
+    const answers = await inquirer.prompt(questions);
+
+    Object.keys(answers).forEach(key => {
+        rootTemplate.Parameters[key].Default = answers[key];
+    });
+    return rootTemplate;
 }
 
 async function stageRoot(context, result){
@@ -102,15 +156,15 @@ async function stageRoot(context, result){
         result.options,
       );
       await context.amplify.copyBatch(context, copyJobs, result);
-      if (result.nestedTemplate === "YES"){
-        const fileuploads = fs.readdirSync(`${results.folderLocation}`);
+      if (result.isNestedTemplate === "YES"){
+        const fileuploads = fs.readdirSync(`${result.nestedFolder}`);
 
         if (!fs.existsSync(`${targetDir}/custom/${result.projectName}/src/`)) {
             fs.mkdirSync(`${targetDir}/custom/${result.projectName}/src/`);
         }
 
         fileuploads.forEach((filePath) => {
-            fs.copyFileSync(`${results.folderLocation}/${filePath}`, `${targetDir}/custom/${result.projectName}/src/${filePath}`);
+            fs.copyFileSync(`${result.nestedFolder}/${filePath}`, `${targetDir}/custom/${result.projectName}/src/${filePath}`);
         });
         copyFilesToS3(context, result.options, result)
       }
@@ -135,11 +189,11 @@ async function copyFilesToS3(context, options, props) {
     const fileuploads = fs.readdirSync(distributionDirPath);
   
     fileuploads.forEach((filePath) => {
-      uploadFile(s3Client, targetBucket, distributionDirPath, filePath);
+      uploadFile(s3Client, targetBucket, distributionDirPath, filePath, props.projectName);
     });
 }
   
-async function uploadFile(s3Client, hostingBucketName, distributionDirPath, filePath) {
+async function uploadFile(s3Client, hostingBucketName, distributionDirPath, filePath, projectName) {
     let relativeFilePath = path.relative(distributionDirPath, filePath);
   
     relativeFilePath = relativeFilePath.replace(/\\/g, '/');
@@ -148,7 +202,7 @@ async function uploadFile(s3Client, hostingBucketName, distributionDirPath, file
     const contentType = mime.lookup(relativeFilePath);
     const uploadParams = {
       Bucket: hostingBucketName,
-      Key: `src/${filePath}`,
+      Key: `amplify-cfn-templates/${projectName}/${filePath}`,
       Body: fileStream,
       ContentType: contentType || 'text/plain',
       ACL: 'public-read',

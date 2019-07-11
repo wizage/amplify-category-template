@@ -5,5 +5,5 @@ module.exports = (context) => {
 };
 
 async function removeTemplate(context){
-
+    context.amplify.removeResource(context, 'custom');
 }

@@ -1,5 +1,6 @@
 const questions = require('./questions.json');
 const fs = require('fs');
+const { yamlParse, yamlDump } = require('yaml-cfn');
 const inquirer = require('inquirer');
 const path = require('path');
 const mime = require('mime-types');
@@ -41,20 +42,32 @@ async function prepareCloudFormation(context, result){
     if (ending.toLowerCase() === 'json'){
         await handleJSON(context, result);
     } else if (ending.toLowerCase() === 'yaml'){
-        await handleYAML(result);
+        await handleYAML(context, result);
     } else {
         console.log('Error! Can\'t find ending');
     }
+    await stageRoot(context, result);
 }
 
-async function handleYAML(reuslt){
-    console.log("To be implemented");
+async function handleYAML(context, result){
+    let rootTemplate = yamlParse(fs.readFileSync(result.root,'utf8'));
+    rootTemplate = await prepareTemplate(context, result, rootTemplate);
+    rootTemplate = await generateQuestions(context, rootTemplate);
+    fs.writeFileSync(result.root, yamlDump(rootTemplate, null, 4));
 }
 
 async function handleJSON(context, result){
+    
+    let rootTemplate = JSON.parse(fs.readFileSync(result.root));
+    rootTemplate = await prepareTemplate(context, result, rootTemplate);
+    rootTemplate = await generateQuestions(context, rootTemplate);
+    fs.writeFileSync(result.root, JSON.stringify(rootTemplate, null, 4));
+}
+
+async function prepareTemplate(context, result, rootTemplate){
     const { amplify } = context;
     const targetBucket = amplify.getProjectMeta().providers.awscloudformation.DeploymentBucketName;
-    let rootTemplate = JSON.parse(fs.readFileSync(result.root));
+
     if (!rootTemplate.Parameters){
         rootTemplate.Parameters = {}
     } 
@@ -78,10 +91,7 @@ async function handleJSON(context, result){
             }
         });
     }
-    rootTemplate = await generateQuestions(context, rootTemplate)
-    //Write out to root template and stage.
-    fs.writeFileSync(result.root, JSON.stringify(rootTemplate, null, 4));
-    await stageRoot(context, result);
+    return rootTemplate
 }
 
 async function generateQuestions(context, rootTemplate){
@@ -89,6 +99,7 @@ async function generateQuestions(context, rootTemplate){
     let questions = []
 
     Object.keys(rootTemplate.Parameters).forEach(key => {
+        if (key === "env") return;
         let question = {};
         let param = rootTemplate.Parameters[key];
         question.name = key;

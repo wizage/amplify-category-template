@@ -13,7 +13,8 @@
   "keywords": [
     "amplify",
     "plugin",
-    "template"
+    "template",
+    "custom"
   ],
   "author": "wizage",
   "license": "ISC",
@@ -22,10 +23,9 @@
   },
   "homepage": "https://github.com/wizage/amplify-category-template#readme",
   "dependencies": {
-    "fs": "0.0.1-security",
-    "inquirer": "^6.3.1",
+    "inquirer": "^6.5.0",
     "mime-types": "^2.1.24",
     "path": "^0.12.7",
-    "yaml": "^1.5.0"
+    "yaml-cfn": "^0.2.1"
   }
 }

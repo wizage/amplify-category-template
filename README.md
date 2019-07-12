@@ -7,7 +7,7 @@
 
 An easy way to add custom CloudFormation templates to your Amplify Project
 
-![Demo](.images/demo.gif)
+![Demo](.images/demoTemplate.gif)
 
 ## Installation
 

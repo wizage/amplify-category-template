@@ -1,4 +1,10 @@
 # Amplify Template
+<p>
+  <a href="https://www.npmjs.com/package/amplify-category-template">
+      <img src="https://img.shields.io/npm/v/amplify-category-template.svg" />
+  </a>
+</p>
+
 An easy way to add custom CloudFormation templates to your Amplify Project
 
 ![Demo](.images/demo.gif)

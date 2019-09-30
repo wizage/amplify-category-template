@@ -1,0 +1,9 @@
+{
+    "name": "template",
+    "type": "category",
+    "commands": [
+        "add",
+        "help",
+        "remove"
+    ]
+}
